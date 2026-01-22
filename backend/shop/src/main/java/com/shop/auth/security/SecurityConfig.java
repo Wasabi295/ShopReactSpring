@@ -77,7 +77,8 @@ public class SecurityConfig {
 
                          .allowedOrigins(
 
-                             "http://localhost:5173"
+                             "http://localhost:5173",
+                                 "ephemeral-scone-d28d9a.netlify.app"
                          )
                         .allowedMethods("GET", "POST", "PUT", "DELETE", "OPTIONS")
                         .allowedHeaders("*")
