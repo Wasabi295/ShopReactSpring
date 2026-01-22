@@ -1,0 +1,88 @@
+package com.shop.auth.security;
+
+import lombok.RequiredArgsConstructor;
+import org.springframework.context.annotation.Bean;
+import org.springframework.context.annotation.Configuration;
+import org.springframework.http.HttpMethod;
+import org.springframework.security.authentication.AuthenticationManager;
+import org.springframework.security.config.annotation.authentication.configuration.AuthenticationConfiguration;
+import org.springframework.security.config.annotation.web.builders.HttpSecurity;
+import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
+import org.springframework.security.config.http.SessionCreationPolicy;
+import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
+import org.springframework.security.crypto.password.PasswordEncoder;
+import org.springframework.security.web.SecurityFilterChain;
+import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
+import org.springframework.web.servlet.config.annotation.CorsRegistration;
+import org.springframework.web.servlet.config.annotation.CorsRegistry;
+import org.springframework.web.servlet.config.annotation.WebMvcConfigurer;
+
+@Configuration
+@EnableWebSecurity
+@RequiredArgsConstructor
+public class SecurityConfig {
+
+    private final JwtFilter jwtFilter;   // ← now Spring sees it as OncePerRequestFilter
+
+    @Bean
+    public PasswordEncoder passwordEncoder() {
+        return new BCryptPasswordEncoder(12);
+    }
+
+    @Bean
+    public AuthenticationManager authenticationManager(AuthenticationConfiguration config) throws Exception {
+        return config.getAuthenticationManager();
+    }
+
+    @Bean
+    public SecurityFilterChain filterChain(HttpSecurity http) throws Exception {
+        return http
+                .csrf(csrf -> csrf.disable())
+                .sessionManagement(s -> s.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
+                .authorizeHttpRequests(auth -> auth
+                        .requestMatchers("/swagger-ui.html", "/swagger-ui/**", "/api-docs/**", "/actuator/**", "/webjars/**").permitAll()
+                        .requestMatchers("/api/auth/**").permitAll()
+                        .requestMatchers("/api/users/register").permitAll()
+                        .requestMatchers(HttpMethod.GET, "/api/users/profile").authenticated()
+
+                        /* ---- USER MANAGEMENT ---- */
+                        .requestMatchers("/api/users/**").hasAuthority("ADMIN")
+
+                        /* ---- CUSTOMER – doar citire ---- */
+                        // Folosim hasAnyAuthority pentru a potrivi exact "CUSTOMER" sau "ADMIN" din JWT
+                        .requestMatchers(HttpMethod.GET, "/api/products/**")
+                        .hasAnyAuthority("CUSTOMER", "ADMIN")
+
+                        /* ---- ADMIN – CRUD complet ---- */
+                        // Folosim hasAuthority pentru a potrivi exact "ADMIN"
+                        .requestMatchers(HttpMethod.POST, "/api/products").hasAuthority("ADMIN")
+                        .requestMatchers(HttpMethod.PUT, "/api/products/**").hasAuthority("ADMIN")
+                        .requestMatchers(HttpMethod.DELETE, "/api/products/**").hasAuthority("ADMIN")
+
+                        /* ---- Dashboard – doar ADMIN ---- */
+                        .requestMatchers("/api/admin/**").hasAuthority("ADMIN")
+
+                        .anyRequest().authenticated())
+                .addFilterBefore(jwtFilter, UsernamePasswordAuthenticationFilter.class)
+                .build();
+    }
+
+    @Bean
+    public WebMvcConfigurer corsConfigurer() {
+        return new WebMvcConfigurer() {
+            @Override
+            public void addCorsMappings(CorsRegistry registry) {
+                CorsRegistration corsRegistration = registry.addMapping("/**")
+                        .allowedOriginPatterns("*")
+
+                         .allowedOrigins(
+
+                             "http://localhost:5173"
+                         )
+                        .allowedMethods("GET", "POST", "PUT", "DELETE", "OPTIONS")
+                        .allowedHeaders("*")
+                        .allowCredentials(true);
+            }
+        };
+    }
+}
