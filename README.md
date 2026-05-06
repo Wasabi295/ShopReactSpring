@@ -83,7 +83,6 @@ cd backend/shop
 ./gradlew bootRun
 ```
 
-The backend reads `application.properties`. All secrets (DB URL, Redis password, JWT secret) are wired through environment variables — set them via a `.env` file or your shell. **Do not commit real credentials**: rotate any keys that appear in the repo's example properties before going to production.
 
 ## API documentation
 
